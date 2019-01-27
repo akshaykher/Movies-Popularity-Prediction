@@ -12,11 +12,11 @@ The movies dataset is obtained through Rotten Tomatoes and IMDB for a random sam
 
 3. EDA: Performed exploratory data analysis (EDA) that addresses the research question I outlined above. 
 
-4. Modeling: Developed a multiple linear regression model to predict a numerical variable in the dataset.
+4. Modeling: Developed a multiple linear regression model to predict the rating of a movie in the dataset.
 
 5. Prediction: Picked a movie from 2016 (a new movie that is not in the sample) and did a prediction for this movie using the model developed. Also quantified the uncertainty around this prediction using an appropriate interval.
 
-6. Conclusion: Includes a brief summary of my findings from the previous sections. Also discussed any shortcomings of the current study (either due to data collection or methodology) and included ideas for possible future research.
+6. Conclusion: Includeed a brief summary of my findings from the previous sections. Also discussed any shortcomings of the current study (either due to data collection or methodology) and included ideas for possible future research.
 
 
 
