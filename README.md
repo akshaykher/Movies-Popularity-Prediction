@@ -10,7 +10,7 @@ The movies dataset is obtained through Rotten Tomatoes and IMDB for a random sam
 
 2. Research question: Came up with a research question that I wanted to answer.
 
-3. EDA: Performed exploratory data analysis (EDA) that addresses the research question I outlined above. 
+3. EDA: Performed exploratory data analysis (EDA) that addresses the research question outlined above. 
 
 4. Modeling: Developed a multiple linear regression model to predict the rating of a movie in the dataset.
 
