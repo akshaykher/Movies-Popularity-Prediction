@@ -1,0 +1,399 @@
+---
+title: "What Makes a Movies Popular?"
+author: Akshay Kher
+date: 18th November, 2018
+output: 
+  html_document: 
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+---
+# {.tabset .tabset-fade}
+
+## Setup 
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(dplyr)
+library(ggplot2)
+library(GGally)
+library(tidyr)
+library(lubridate)
+library(tibble)
+library(DT)
+library(statsr)
+library(SignifReg)
+library(tidyverse)
+library(car)
+```
+
+### Load data
+
+```{r load-data}
+load("movies.Rdata")
+```
+
+* * *
+
+## 1. Data
+
+The data set comprises of 651 randomly sampled movies produced and released before 2016. Although random sampling was used, the population of movies considered is only Hollywood. Further, the rating of the movie is drawn from popular sites like IMDB and Rotten Tomatoes, whose users might not be representative of the world's population in general. 
+
+
+**Codebook**
+
+1. **title**: Title of movie
+2. **title_type**: Type of movie (Documentary, Feature Film, TV Movie)
+3. **genre**: Genre of movie (Action & Adventure, Comedy, Documentary, Drama, Horror, Mystery & Suspense, Other)
+4. **runtime**: Runtime of movie (in minutes)
+5. **mpaa_rating**: MPAA rating of the movie (G, PG, PG-13, R, Unrated)
+6. **studio**: Studio that produced the movie
+7. **thtr_rel_year**: Year the movie is released in theaters
+8. **thtr_rel_month**: Month the movie is released in theaters
+9. **thtr_rel_day**: Day of the month the movie is released in theaters
+10. **dvd_rel_year**: Year the movie is released on DVD
+11. **dvd_rel_month**: Month the movie is released on DVD
+12. **dvd_rel_day**: Day of the month the movie is released on DVD
+13. **imdb_rating**: Rating on IMDB
+14. **imdb_num_votes**: Number of votes on IMDB
+15. **critics_rating**: Categorical variable for critics rating on Rotten Tomatoes (Certified Fresh, Fresh, Rotten)
+16. **critics_score**: Critics score on Rotten Tomatoes
+17. **audience_rating**: Categorical variable for audience rating on Rotten Tomatoes (Spilled, Upright)
+18. **audience_score**: Audience score on Rotten Tomatoes
+19. **best_pic_nom**: Whether or not the movie was nominated for a best picture Oscar (no, yes)
+20. **best_pic_win**: Whether or not the movie won a best picture Oscar (no, yes)
+21. **best_actor_win**: Whether or not one of the main actors in the movie ever won an Oscar (no, yes) - note that this is not necessarily whether the actor won an Oscar for their role in the given movie
+22. **best_actress** win: Whether or not one of the main actresses in the movie ever won an Oscar (no, yes) - not that this is not necessarily whether the actresses won an Oscar for their role in the given movie
+23. **best_dir_win**: Whether or not the director of the movie ever won an Oscar (no, yes) - not that this is not necessarily whether the director won an Oscar for the given movie
+24. **top200_box**: Whether or not the movie is in the Top 200 Box Office list on BoxOfficeMojo (no, yes)
+25. **director**: Director of the movie
+26. **actor1**: First main actor/actress in the abridged cast of the movie
+27. **actor2**: Second main actor/actress in the abridged cast of the movie
+28. **actor3**: Third main actor/actress in the abridged cast of the movie
+29. **actor4**: Fourth main actor/actress in the abridged cast of the movie
+30. **actor5**: Fifth main actor/actress in the abridged cast of the movie
+31. **imdb_url**: Link to IMDB page for the movie
+32. **rt_url**: Link to Rotten Tomatoes page for the movie
+
+**Conclusions**
+
+1. As our sample might not be a good representation of the world population, we  have to careful in making generalized inferences. Further, any inference drawn would be applicable to only Hollywood movies.
+
+2. Considering this is an observational study (as opposed to an experimental study with random assignment), we will refrain from establishing casual relationships between variables.
+
+* * *
+
+## 2. Research question
+
+Perhaps the greatest art form of the modern age, **movies** embody all that's great in the world of media. All rolled into one, we get beautiful visuals, gorgeous music, thought-provoking stories, parables on morality, commentaries on society, insights into history, and so much more. Not to mention, they're just really friggin' fun to watch; so why wouldn't you want to learn more about them?
+
+> In this analysis we want to answer the question **what makes a movie popular?**
+
+* * *
+
+## 3. Exploratory data analysis {.tabset .tabset-fade .tabset-pills}
+
+### Our Data
+We have a data of 651 randomly sampled movies with 32 variables
+```{r}
+datatable(movies)
+```
+
+Removing 1 duplicate row
+```{r}
+movies <- movies[!duplicated(movies),]
+nrow(movies)
+```
+
+### Reponse Variable
+**Audience Scores** vary from 11-97 and 50% of these scores range between 46-80. 
+```{r}
+summary(movies$audience_score)
+```
+
+**Audience Scores** are left-skewed as well.
+```{r warning=FALSE,message=FALSE}
+ggplot(movies,aes(x=audience_score)) + 
+  geom_histogram()
+```
+
+### Explanatory Variables - Numeric
+
+* **runtime** - Highly right skewed. Slight positive **correlation of 0.182** with audience_score. 
+* **imdb_rating** - Slightly left skewed. High positive **correlation of 0.865** with audience_score. It could be included in the model.
+* **imdb_num_votes** - Highly right skewed. Low positive **correlation of 0.29** with audience_score.
+* **critics_score** - Multi-Modal Distribution. High positive **correlation of 0.703** with audience_score. It could be included in the model.
+
+```{r warning=FALSE, message=FALSE}
+movies %>%
+select(audience_score,runtime,imdb_rating,imdb_num_votes,critics_score) %>%
+ggpairs()
+```
+
+### Explanatory Variables - Categorical
+
+**title_type**: Documentaries have a higher audience score as compared to Feature Films and TV Movies.
+```{r}
+df<-
+tapply(movies$audience_score,movies$title_type,mean) %>%
+  as.data.frame(names="mean_audience_score") %>%
+  rename("mean_audience_score" = ".") %>%
+  rownames_to_column("title_type")
+
+ggplot(df,aes(x=title_type,y=mean_audience_score)) +
+  geom_bar(stat="identity") +
+  labs(x=NULL, y = "Audience Score")
+```
+
+**genre**: Documentaries and Musicals are rated highly whereas Horror movies are generally not that well accepted.
+```{r}
+df<-
+sort(tapply(movies$audience_score,movies$genre,mean),decreasing = TRUE) %>%
+  as.data.frame(names="mean_audience_score") %>%
+  rename("mean_audience_score" = ".") %>%
+  rownames_to_column("genre")
+
+ggplot(df,aes(x=reorder(genre, mean_audience_score),y=mean_audience_score)) +
+  geom_bar(stat="identity") +
+  labs(x=NULL, y = "Audience Score") +
+  coord_flip()
+  
+```
+
+**mpaa_rating**: Movies for general audiences are rated slightly higher than movies meant for more matured audience.
+
+* **Unrated** - Rating not available
+* **G** - General Audiences. All ages admitted.
+* **NC-17** - No Children. No one 17 and under admitted.
+* **R** - Restricted. Under 17 requires accompanying parent or adult guardian.
+* **PG** - Parental Guidance Suggested. Some material may not be suitable for children.
+* **PG-13** - Parents Strongly Cautioned. Some material may be inappropriate for children under 13.
+```{r}
+df <- 
+sort(tapply(movies$audience_score,movies$mpaa_rating,mean),decreasing = TRUE) %>%
+  as.data.frame(names="mean_audience_score") %>%
+  rename("mean_audience_score" = ".") %>%
+  rownames_to_column("mpaa_rating")
+
+ggplot(df,aes(x=reorder(mpaa_rating,-mean_audience_score),y=mean_audience_score)) +
+  geom_bar(stat="identity") + 
+  labs(x=NULL, y = "Audience_Score")
+```
+
+
+If the movie has won or been nominated for the best film at Oscars or featured in top 200 Box Office list on BoxOfficeMojo then it's more popular among the audience.
+
+At the same time having Oscar awarded actors, actresses or directors in the movie does not seem to impact the audience rating. 
+```{r}
+df <-
+movies %>%
+  select(best_pic_nom,best_pic_win,best_actor_win,best_actress_win,
+         best_dir_win,top200_box,audience_score) %>%
+  gather(Variable,Value, -audience_score) %>%
+  group_by(Variable,Value) %>%
+  summarize(mean_audience_score = mean(audience_score))
+
+ggplot(df,aes(x=Variable,y=mean_audience_score,fill=Value)) +
+  geom_bar(position="dodge",stat="identity") +
+  labs(x=NULL, y = "Audience_Score")
+```
+
+## 4. Modeling {.tabset .tabset-fade .tabset-pills}
+
+### Building the Model
+
+Using the Exploratory Data Analysis, these are the predictor variables which seemed to have some association with the audience score:
+
+* runtime
+* imdb_rating
+* imdb_num_votes
+* critics_score
+* genre+mpaa_rating
+* best_pic_nom
+* best_pic_win
+* top200_box
+
+Now we will run a **forward-selection** algorithm to determine the best possible predictor variables based on **Adjusted R-Squared**
+
+```{r}
+scope <- audience_score~
+            runtime+
+            imdb_rating+
+            imdb_num_votes+
+            critics_score+
+            genre+mpaa_rating+
+            best_pic_nom+
+            best_pic_win+
+            top200_box
+
+model <- SignifReg(scope=scope,
+                   data=movies,
+                   alpha=0.05,
+                   direction="forward",
+                   criterion="r-adj",
+                   correction="FDR")
+
+summary(model)
+```
+
+
+The final model has an **Adjusted R-Squared of 0.7638** and the chosen predictors are:
+
+* imdb_rating
+* genre
+* critics_score
+
+### Model Diagnostics
+
+We will check all the assumptions of a linear regression model:
+
+1. **Errors are normally distributed with mean=0**
+
+Using a Histogram, errors seem to be normally distributed and centred at 0.
+```{r warning=FALSE, message=FALSE}
+df <- data.frame(res=model$residuals)
+
+df %>% 
+  ggplot(aes(x=res)) +
+  geom_histogram() 
+```
+
+Using a Q-Q Plot, errors seem to be normally distributed as well.
+```{r}
+qqnorm(model$residuals)
+qqline(model$residuals, col='red')
+
+```
+
+2. **Uncorrelated Errors **
+
+There seems to be no pattern for the errors over time (index). Thus we can safely assume that the errors (hence the observations) are uncorrelated.
+```{r} 
+plot(model$residuals)
+```
+
+3. **Constance Variance**
+
+**This assumption is not satisfied**. We can clearly see that the errors are more varied for lesser predicted values as compared to higher predicted values. We might need to transform our response variable or predictor variables or both to satisfy this condition.
+```{r}
+df <- data.frame(residuals = model$residuals, predicted_values = model$fitted.values)
+ggplot(df, aes(x=predicted_values,y=residuals)) +
+  geom_point() +
+  geom_hline(yintercept = 0)
+```
+
+Using box-cox transformation, the best transformation of **response variable** is very close to the response variable itself (lambda ~ 1). Thus we will not transform the response variable.
+```{r}
+
+bc <- MASS::boxcox(audience_score ~
+               imdb_rating+
+               critics_score+
+               runtime +
+               best_pic_nom +
+               genre
+             ,data=movies)
+```
+
+Applying Inverse Transformation to the **predictor variable** imdb_rating
+```{r}
+new_model <- lm(audience_score ~
+                I(1/imdb_rating)+
+                genre+
+                critics_score,
+                data=movies)
+```
+
+
+We can see that after the transformation the errors - although not perfectly - are randomly scattered around 0. Thus we can asssume that the condition of constant variance is met. 
+```{r}
+df <- data.frame(residuals = new_model$residuals, predicted_values = new_model$fitted.values)
+ggplot(df, aes(x=predicted_values,y=residuals)) +
+  geom_point() +
+  geom_hline(yintercept = 0)
+```
+
+4. **Predictor Variables are independent of each other**
+
+As the **Variation Inflation Factor** < 5 for each predictor variable, we can assume that there is no multi-collinearity.
+```{r}
+vif <- vif(new_model)
+vif[,1]
+```
+
+5. **No influential outliers**
+
+Almost all **standardized errors** are below the absolute value of 4. Thus we do not have any extreme outliers that may be influencing the regression line. 
+```{r}
+rstan <- rstandard(new_model)  # studentized
+plot(rstan)
+```
+
+### Model Interpretation
+
+**Interpreting the Model**:
+
+* **64% variance** in audience score is explained by 1/imdb_rating, genre and critics score.
+* All held constant, with 1 unit increase in critics score, the average audience score **increases by 0.26 units**.
+* A more concrete way of elaborating the above point would be: All held constant, we are **95 % confident** that with 1 unit increase in critics score, the average audience score **increases by 0.21 - 0.30 units**.
+* All held constant, with 1 unit increase in 1/imdb_rating, the average audience score **decreases by 237 units**.
+* A more concrete way of elaborating the above point would be: All held constant, we are **95 % confident** that with 1 unit increase in 1/imdb_rating, the average audience score **decreases by 204 to 269 units**.
+* For genre, the **reference level** is *Action*. The interpretation of all other genres must be made in relation to this reference level. Ex: All held constant, *Musical & Performing Arts* are rated, on an average, **7.77** points higher than the *Action* movies.
+* A more concrete way of elaborating the above point would be: All held constant, we are 95% confident that *Musical & Performing Arts* are rated, on an average, **0.11-15.43 points higher** than the *Action* movies.
+* The **t-tests** correspond to the following hypothesis test:
+    + H0: Beta = 0
+    + HA: Beta !=0
+    + For all p-values < 0.05, we reject H0
+    + We can see that for each of the 3 predictor variables (and at least one level of genre), the p-value < 0.05. **Thus the estimates (Beta's) are significant**.
+* The **f-test** correspond to the following hypotheis test:
+    + H0: All Beta's = 0
+    + HA: At least one Beta != 0
+    + As p-value < 0.05, we reject H0. **Thus our model as a whole is significant**. 
+ 
+
+
+```{r}
+summary(new_model)
+```
+
+
+```{r}
+confint(new_model)
+```
+
+* * *
+
+## 5. Prediction
+
+#### Predicting the audience score for the movie La La Land:
+
+The current audience score on Rotten Tomatoes is **81** and our model predicts this score to be **80**.
+
+Links:
+
+* https://www.rottentomatoes.com/m/la_la_land/
+* https://www.imdb.com/title/tt3783958/
+
+```{r}
+new_movie <- data.frame(title = "La La Land",
+                        genre = "Comedy",
+                        imdb_rating = 8.1,
+                        critics_score = 91)
+predict(new_model,new_movie) %>%
+  round(2)
+```
+
+#### Prediction Interval:
+
+We are 95% confident that, all else being equal, the predicted audience score for the movie 'La La Land' will be between 80 and 83 on average.
+```{r}
+predict(new_model, new_movie, interval="confidence")
+```
+
+* * *
+
+## 6. Conclusion
+
+* **Genre, IMDB Rating and Critics Score** are the most useful predictors. These 3 combined can explain 64% of the variance in the audience score.
+* As the movies considered are only Hollywood, **we can not make generalized statements about all movies**.
+* Also, as the ratings are only drawn from IMDB and Rotten Tomatoes, **we cannot make generalized inferences about the population in general**.
